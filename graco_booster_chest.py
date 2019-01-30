@@ -8,12 +8,15 @@ Graco
 """
 
 import os 
+import re
 import glob
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-
+import seaborn as sns
 #%%
+PATH = "P:/Data Analysis/Projects/Misc/Graco_Chest/"
+
 directories = ['Q:\\2018\\18-3000\\18-3010 (GRACO)\\',
                'Q:\\2017\\17-3000\\17-3010 (GRACO)\\',
                'Q:\\2016\\16-7000\\16-7010 (Graco)\\',
@@ -57,8 +60,29 @@ high_back = [subset['Setup_Notes'].apply(lambda x: 'highback' in str(x).lower())
 
 subset.loc[pd.concat(low_back, axis=1).any(axis=1), 'MODE'] = 'LOW_BACK'
 subset.loc[pd.concat(high_back, axis=1).any(axis=1), 'MODE'] = 'HIGH_BACK'
-
-#%%
 subset = subset.loc[~subset['MODE'].isna()]
-subset.groupby(['Dummy','Test_Type','Model','MODE','Year']).mean()['Chest_Clip_3ms']
-subset.groupby(['Dummy','Test_Type','MODE','Year']).mean()['Chest_Clip_3ms']
+subset = subset.replace('TURBO BOOSTER BACKLESS','TURBO BOOSTER')
+subset = subset.replace('AFFIX BACKLESS','AFFIX')
+subset = subset.query('Dummy==\'HYBRID III 6Y\'')
+#%% group by test type and model
+figs = [['Test_Type','MODE'],
+        ['MODE']]
+for fig in figs:
+    grouped = subset.groupby(fig)
+    for grp in grouped:
+        model_counts = grp[1][['Model','Year']].drop_duplicates()['Model'].value_counts()
+        grp_subset = grp[1].table.query_list('Model', model_counts[model_counts>1].index)
+        name = re.sub('[(),\']','',str(grp[0])).replace(' ', '_')
+        ax = sns.factorplot(x='Year', y='Chest_Clip_3ms', col='Model', 
+                            kind='bar', data=grp_subset, col_wrap=3, capsize=0.3,
+                            facet_kws={'subplot_kws':{'ylim': [30, 70]}})
+        plt.subplots_adjust(top=0.85)
+        ax.fig.suptitle(grp[0])
+        ax.savefig(PATH + name + '_bymodel.png')
+        plt.show()
+        ax = sns.factorplot(x='Year', y='Chest_Clip_3ms', kind='bar', data=grp_subset, capsize=0.3,
+                            facet_kws={'subplot_kws':{'ylim': [30, 65]}})
+        plt.subplots_adjust(top=0.85)
+        ax.fig.suptitle(grp[0])
+        ax.savefig(PATH + name + '.png')
+        plt.show()
