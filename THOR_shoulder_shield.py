@@ -18,7 +18,16 @@ from PMG.COM.easyname import renameISO
 directory = 'P:\\Data Analysis\\Projects\\AHEC\\THOR\\Prototype Shoulder\\'
 cutoff = range(100, 1600)
 
-channels = ['11HEAD0000THACXA',
+channels = ['11HICR0000TH00RA',
+            '11HICR0036TH00RA',
+            '11HICR0015TH00RA',
+            '11HICR0000THACRA',
+            '11HICR0036THACRA',
+            '11HICR0015THACRA',
+            '11BRIC0000THAV0D',
+            '11HEAD0000THACXA',
+            '11HEAD0000THACZA',
+            '11HEAD0000THACRA',
             '11NECKUP00THFOXA',
             '11NECKUP00THFOYA',
             '11NECKUP00THFOZA',
@@ -77,7 +86,11 @@ for sh in ['HUMANETICS']:
         plt.close(fig)
 
 #%% plot peaks--bar plots
-plot_channels = ['Min_11HEAD0000THACXA',
+plot_channels = ['Max_11HICR0000TH00RA',
+                 'Max_11HICR0036TH00RA',
+                'Max_11HICR0015TH00RA',
+                'Max_11BRIC0000THAV0D',
+                'Min_11HEAD0000THACXA',
                 'Min_11NECKUP00THFOXA',
                 'Max_11NECKUP00THFOXA',
                 'Max_11NECKUP00THFOYA',
@@ -98,18 +111,29 @@ plot_channels = ['Min_11HEAD0000THACXA',
                 'Min_11PELV0000THACXA',
                 'Min_11FEMRLE00THFOZB',
                 'Min_11FEMRRI00THFOZB']
+
+plot_channels = [['Max_11HICR0000TH00RA', 'Max_11HICR0000THACRA'],
+                 ['Max_11HICR0036TH00RA', 'Max_11HICR0036THACRA'],
+                 ['Max_11HICR0015TH00RA', 'Max_11HICR0015THACRA'],
+                 ['Max_11BRIC0000THAV0D'],
+                 ['Min_11HEAD0000THACXA'],
+                 ['Max_11HEAD0000THACZA'],
+                 ['Max_11HEAD0000THACRA']]
+
 for sh in ['HUMANETICS']:
     subset = (table.loc[~table['SHOULDER'].isna()]
                    .query('BELT_SLIP!=\'SLIDE\'')
                    .table.query_list('SHOULDER', ['ORIGINAL', sh]))
     subset['CONDITION'] = subset[['SHOULDER','BELT_SLIP']].apply(tuple, axis=1).astype(str)
     for ch in plot_channels:
-        x = arrange_by_group(subset, features[ch], 'CONDITION')
-        for k in x: 
-            x[k] = x.pop(k).abs().to_frame()
-        if len(x)==0: continue
+        feat_subset = features.loc[subset.index, ch]
+        if len(ch)>1:
+            feat_subset = feat_subset.dropna(how='all').apply(np.nansum, axis=1).rename('ch').abs()
+        else:
+            feat_subset = feat_subset.squeeze().rename('ch').abs()
         fig, ax = plt.subplots()
-        ax = plot_bar(ax, x)
-        ax = set_labels(ax, {'title': ch, 'legend': {'bbox_to_anchor': (1,1)}})
+        ax = sns.stripplot(x='CONDITION', y='ch', data=pd.concat((subset, feat_subset), axis=1))
+        ax = set_labels(ax, {'title': ch})
         plt.show()
         plt.close(fig)
+        print(pd.concat((subset, feat_subset), axis=1).groupby('CONDITION').mean())
