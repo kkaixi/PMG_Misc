@@ -36,8 +36,7 @@ channels = ['11HEAD0000THACXA','11HEAD0000THACYA','11HEAD0000THACZA',
             '11SEBE0000B3FO0D','11SEBE0000B6FO0D',
             '10SIMELE00INACXD','10SIMERI00INACXD','10CVEHCG0000ACXD']
 table_filters = {'query': 'SPEED==48',
-                 'drop': ['TC11-504',
-                          'TC13-024']}
+                 'drop': ['TC13-024']}
 preprocessing = None
 
 
@@ -48,13 +47,15 @@ dataset.preprocessing = preprocessing
 
 dataset.get_data(['timeseries'])
 features = get_peaks(dataset.timeseries)
+features.at['TC18-212', 'Min_10SIMERI00INACXD'] = np.nan
+features.at['TC18-030', 'Min_10SIMELE00INACXD'] = np.nan
 #%% plot 
 # columns are WHEEL, A_PILLAR, CROSS_MEMBER_BEND, IP_INTRUSION,
 # DOOR_A_PILLAR, DOOR_B_PILLAR, DOOR, ROOF_FOLDING, SIDE_AIRBAG_DEPLOYED
 plot_channels = ['10SIMELE00INACXD',
                  '10CVEHCG0000ACXD',
                  '11SEBE0000B6FO0D']
-col = 'WHEEL'
+col = 'CROSS_MEMBER_BEND'
 
 for ch in plot_channels:
     fig, ax = plt.subplots()
@@ -96,7 +97,8 @@ for ch in plot_channels:
     fig, ax = plt.subplots()
     x = features.loc[dataset.table.index, ch]
     cond = dataset.table[col]
-    ax = sns.barplot(x='cond', y='ch', data=pd.DataFrame({'ch': x, 'cond': cond}), order=['None','Detached','Rim Damage'])
+#    ax = sns.barplot(x='cond', y='ch', data=pd.DataFrame({'ch': x, 'cond': cond}), order=['None','Detached','Rim Damage'])
+    ax = sns.barplot(x='cond', y='ch', data=pd.DataFrame({'ch': x, 'cond': cond}))
     ax.set_title(ch)
     
 #%%
@@ -108,3 +110,48 @@ for i in range(len(cols)-1):
     for j in range(i+1, len(cols)):
         print(dataset.table.groupby([cols[i], cols[j]]).count()['MODEL'])
         print('\n')
+
+#%% compare deformations at different points
+plot_channels = ['Min_10SIMELE00INACXD',
+                 'Min_10CVEHCG0000ACXD',
+                 'Min_10SIMERI00INACXD']
+cols = ['A_PILLAR','DOOR_A_PILLAR','DOOR_B_PILLAR','ROOF_FOLDING']
+for ch in plot_channels:
+    data = (dataset.table[cols]
+                   .reset_index()
+                   .melt(id_vars=['TC'], value_vars=cols)
+                   .replace({0:np.nan})
+                   .dropna())
+    data[ch] = data[['TC','value']].apply(lambda x: features.at[x['TC'], ch], axis=1)
+    data = data.set_index('TC')
+    fig, ax = plt.subplots()
+    ax = sns.barplot(x='variable', y=ch, ax=ax, data=data)
+#    ax = sns.catplot(x='variable', y=ch, ax=ax, data=data, color='#000000')
+    plt.show()
+    plt.close(fig)
+    
+#%% compare combinations of deformations
+plot_channels = ['Min_10SIMELE00INACXD',
+                 'Min_10CVEHCG0000ACXD',
+                 'Min_10SIMERI00INACXD']
+cols = ['A_PILLAR','DOOR_A_PILLAR','DOOR_B_PILLAR','ROOF_FOLDING']
+
+def_key = {x[1]: x[0] for x in enumerate(dataset.table[cols].drop_duplicates().apply(tuple, axis=1))}
+
+for ch in plot_channels:
+    data = pd.concat((dataset.table[cols].apply(lambda x: def_key[tuple(x)], axis=1).rename('x'), features[ch]), axis=1)
+    fig, ax = plt.subplots()
+    ax = sns.barplot(x='x', y=ch, ax=ax, data=data)
+    ax = sns.catplot(x='x', y=ch, ax=ax, data=data, color='#000000')
+#%% compare number of deformations with vehicle response
+plot_channels = ['Min_10SIMELE00INACXD',
+                 'Min_10CVEHCG0000ACXD',
+                 'Min_10SIMERI00INACXD']
+cols = ['A_PILLAR','DOOR_A_PILLAR','DOOR_B_PILLAR','ROOF_FOLDING']
+for ch in plot_channels:
+    data = pd.concat((dataset.table[cols].sum(axis=1), features[ch]), axis=1)
+    data = data.rename({0: 'num_deform'}, axis=1)
+    fig, ax = plt.subplots()
+    ax = sns.barplot(x='num_deform', y=ch, ax=ax, data=data)
+    ax = sns.catplot(x='num_deform', y=ch, ax=ax, data=data, color='#000000')
+#    ax = sns.regplot(x='num_deform', y=ch, ax=ax, data=data)
